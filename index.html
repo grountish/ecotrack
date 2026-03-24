@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EcoTrack Finance Fortnight Tracker</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%231e5c51'/%3E%3Cpath d='M17 36h10l5-14 7 21 6-14h4' fill='none' stroke='%23f7f1e8' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="card chart-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Trend</p>
+            <h2>Biweekly line chart</h2>
+          </div>
+          <div class="chart-side">
+            <button
+              type="button"
+              class="action-button chart-toggle"
+              data-action="toggle-projection"
+              id="projection-toggle"
+            >
+              Show projection +6 months
+            </button>
+            <p id="projection-summary" class="projection-summary"></p>
+            <div id="chart-legend" class="chart-legend" aria-label="Chart legend"></div>
+          </div>
+        </div>
+        <div id="chart" class="chart-shell" aria-live="polite"></div>
+      </section>
+
+      <section class="card board-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Periods</p>
+            <h2>Sources by fortnight</h2>
+          </div>
+          <p class="section-note">
+            Dates define each 14-day window. Data is stored locally in your
+            browser.
+          </p>
+        </div>
+        <div class="table-wrap">
+          <table class="tracker-table">
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+            <tfoot id="table-foot"></tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section id="summary" class="summary-grid" aria-label="Tracker summary"></section>
+
+      <section class="toolbar card">
+        <button type="button" class="action-button primary" data-action="add-source">
+          Add source
+        </button>
+        <button type="button" class="action-button" data-action="add-period">
+          Add 2-week period
+        </button>
+        <button type="button" class="action-button subtle" data-action="reset">
+          Reset sample
+        </button>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
