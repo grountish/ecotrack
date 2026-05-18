@@ -90,6 +90,7 @@ input {
   gap: 8px;
   padding: 10px 12px;
   justify-content: flex-start;
+  align-items: center;
 }
 
 .eyebrow {
@@ -142,6 +143,18 @@ input {
 .action-button.subtle {
   color: var(--danger);
   border-color: rgba(255, 143, 143, 0.35);
+}
+
+.data-transfer-status {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.data-transfer-status.is-error {
+  color: var(--danger);
 }
 
 .summary-grid {

@@ -9,6 +9,8 @@ const chartEl = document.querySelector("#chart");
 const chartLegendEl = document.querySelector("#chart-legend");
 const projectionToggleEl = document.querySelector("#projection-toggle");
 const projectionSummaryEl = document.querySelector("#projection-summary");
+const importInputEl = document.querySelector("#data-import-file");
+const dataTransferStatusEl = document.querySelector("#data-transfer-status");
 
 const FORECAST_PERIOD_COUNT = 13;
 
@@ -50,6 +52,16 @@ function bindEvents() {
       state = createDefaultState();
       saveState();
       renderApp();
+      return;
+    }
+
+    if (action === "export-data") {
+      exportData();
+      return;
+    }
+
+    if (action === "import-data") {
+      importInputEl?.click();
       return;
     }
 
@@ -98,6 +110,12 @@ function bindEvents() {
   });
 
   document.addEventListener("change", (event) => {
+    if (event.target === importInputEl) {
+      importDataFile(importInputEl.files?.[0]);
+      importInputEl.value = "";
+      return;
+    }
+
     const dateInput = event.target.closest("[data-period-date]");
     if (!dateInput) {
       return;
@@ -648,6 +666,70 @@ function removePeriod(periodId) {
   renderApp();
 }
 
+function exportData() {
+  const payload = {
+    app: "ecotrack-finance-fortnight-tracker",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    storageKey: STORAGE_KEY,
+    state,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ecotrack-data-${formatISODate(new Date())}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  setDataTransferStatus(
+    `Exported ${state.sources.length} sources and ${state.periods.length} periods.`,
+  );
+}
+
+async function importDataFile(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(await file.text());
+    const importedState = extractImportedState(parsed);
+    state = normalizeState(importedState);
+    saveState();
+    renderApp();
+    setDataTransferStatus(
+      `Imported ${state.sources.length} sources and ${state.periods.length} periods from ${file.name}.`,
+    );
+  } catch {
+    setDataTransferStatus("Import failed. Choose a valid EcoTrack JSON export.", true);
+  }
+}
+
+function extractImportedState(input) {
+  if (input?.state && Array.isArray(input.state.sources) && Array.isArray(input.state.periods)) {
+    return input.state;
+  }
+
+  if (Array.isArray(input?.sources) && Array.isArray(input?.periods)) {
+    return input;
+  }
+
+  throw new Error("Invalid EcoTrack import file");
+}
+
+function setDataTransferStatus(message, isError = false) {
+  if (!dataTransferStatusEl) {
+    return;
+  }
+
+  dataTransferStatusEl.textContent = message;
+  dataTransferStatusEl.classList.toggle("is-error", isError);
+}
+
 function computePeriodTotal(periodId) {
   return state.sources.reduce((sum, source) => sum + getAmount(source, periodId), 0);
 }
@@ -835,16 +917,23 @@ function saveState() {
 }
 
 function normalizeState(input) {
+  const normalizedPeriods = input.periods.map((period) => {
+    const startDate = isISODate(period.startDate)
+      ? period.startDate
+      : formatISODate(stripTime(new Date()));
+    return {
+      id: normalizeId(period.id, "period"),
+      startDate,
+    };
+  });
+  const periodIds = new Set(normalizedPeriods.map((period) => period.id));
   const normalized = {
     sources: input.sources.map((source, index) => ({
-      id: source.id || createId("source"),
+      id: normalizeId(source.id, "source"),
       name: typeof source.name === "string" ? source.name : `Source ${index + 1}`,
-      amounts: source.amounts && typeof source.amounts === "object" ? source.amounts : {},
+      amounts: normalizeAmounts(source.amounts, periodIds),
     })),
-    periods: input.periods.map((period) => ({
-      id: period.id || createId("period"),
-      startDate: isISODate(period.startDate) ? period.startDate : formatISODate(stripTime(new Date())),
-    })),
+    periods: normalizedPeriods,
   };
 
   if (!normalized.sources.length || !normalized.periods.length) {
@@ -895,6 +984,27 @@ function createPeriod(date) {
 
 function createId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeId(value, prefix) {
+  if (typeof value === "string" && /^[a-zA-Z0-9_-]+$/.test(value)) {
+    return value;
+  }
+
+  return createId(prefix);
+}
+
+function normalizeAmounts(amounts, periodIds) {
+  if (!amounts || typeof amounts !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(amounts)
+      .filter(([periodId]) => periodIds.has(periodId))
+      .map(([periodId, value]) => [periodId, parseAmount(value)])
+      .filter(([, value]) => value !== 0),
+  );
 }
 
 function formatRangeLabel(startDate) {
@@ -959,6 +1069,25 @@ function toNumber(value) {
   }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseAmount(value) {
+  if (typeof value !== "string") {
+    return toNumber(value);
+  }
+
+  const compact = value.trim().replace(/\s/g, "");
+  if (!compact) {
+    return 0;
+  }
+
+  const lastCommaIndex = compact.lastIndexOf(",");
+  const lastDotIndex = compact.lastIndexOf(".");
+  const normalized =
+    lastCommaIndex > lastDotIndex
+      ? compact.replace(/\./g, "").replace(",", ".")
+      : compact.replace(/,/g, "");
+  return toNumber(normalized);
 }
 
 function escapeHtml(value) {

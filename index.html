@@ -66,6 +66,14 @@
         <button type="button" class="action-button subtle" data-action="reset">
           Reset sample
         </button>
+        <button type="button" class="action-button" data-action="export-data">
+          Export data
+        </button>
+        <button type="button" class="action-button" data-action="import-data">
+          Import data
+        </button>
+        <input id="data-import-file" type="file" accept="application/json,.json" hidden />
+        <p id="data-transfer-status" class="data-transfer-status" aria-live="polite"></p>
       </section>
     </main>
 
