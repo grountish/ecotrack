@@ -371,7 +371,7 @@ function renderChartControls() {
     : "Show projection +6 months";
 
   if (!viewState.showProjection) {
-    projectionSummaryEl.textContent = "Projection uses the recent biweekly direction.";
+    projectionSummaryEl.textContent = "Projection uses all available filled periods.";
     return;
   }
 
@@ -770,7 +770,7 @@ function buildProjectionContext(periods = getChartPeriods()) {
   const actualSeries = buildActualSeries(periods);
   const series = actualSeries.map((item) => ({
     ...item,
-    forecast: projectSeries(item.actual, FORECAST_PERIOD_COUNT),
+    forecast: projectSeries(item.actual, periods, projectedPeriods),
   }));
 
   return {
@@ -780,26 +780,43 @@ function buildProjectionContext(periods = getChartPeriods()) {
   };
 }
 
-function projectSeries(values, count) {
-  if (!values.length) {
+function projectSeries(values, actualPeriods, projectedPeriods) {
+  if (values.length < 2 || actualPeriods.length < 2) {
     return [];
   }
 
-  const deltas = [];
-  for (let index = 1; index < values.length; index += 1) {
-    deltas.push(values[index] - values[index - 1]);
+  const baseDate = parseISODate(actualPeriods[0].startDate);
+  const points = values.map((value, index) => ({
+    x: getDaysBetween(baseDate, parseISODate(actualPeriods[index].startDate)),
+    y: toNumber(value),
+  }));
+  const trend = fitLinearTrend(points);
+
+  if (!trend) {
+    return [];
   }
 
-  const recentDeltas = deltas.slice(-Math.min(4, deltas.length));
-  const averageDelta = recentDeltas.length
-    ? recentDeltas.reduce((sum, delta) => sum + delta, 0) / recentDeltas.length
-    : 0;
-
-  let current = values.at(-1);
-  return Array.from({ length: count }, () => {
-    current = Math.max(0, current + averageDelta);
-    return current;
+  return projectedPeriods.map((period) => {
+    const x = getDaysBetween(baseDate, parseISODate(period.startDate));
+    return Math.max(0, trend.intercept + trend.slope * x);
   });
+}
+
+function fitLinearTrend(points) {
+  const count = points.length;
+  const sumX = points.reduce((sum, point) => sum + point.x, 0);
+  const sumY = points.reduce((sum, point) => sum + point.y, 0);
+  const sumXX = points.reduce((sum, point) => sum + point.x * point.x, 0);
+  const sumXY = points.reduce((sum, point) => sum + point.x * point.y, 0);
+  const denominator = count * sumXX - sumX * sumX;
+
+  if (denominator === 0) {
+    return null;
+  }
+
+  const slope = (count * sumXY - sumX * sumY) / denominator;
+  const intercept = (sumY - slope * sumX) / count;
+  return { slope, intercept };
 }
 
 function getAmount(source, periodId) {
@@ -1061,6 +1078,11 @@ function addDays(date, days) {
   const copy = new Date(date);
   copy.setDate(copy.getDate() + days);
   return copy;
+}
+
+function getDaysBetween(startDate, endDate) {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  return (stripTime(endDate) - stripTime(startDate)) / millisecondsPerDay;
 }
 
 function toNumber(value) {
